@@ -1,3 +1,6 @@
+parameters:
+    google_credentials_path: '%kernel.project_dir%/%env(GOOGLE_CREDENTIALS_PATH)%'
+
 services:
   Gponty\EntityToGoogleSheetsBundle\Service\EntityReader:
     arguments:
@@ -6,7 +9,7 @@ services:
   Gponty\EntityToGoogleSheetsBundle\Service\GoogleSheetsExporter:
     arguments:
       - '%env(GOOGLE_SHEET_ID)%'
-      - '%env(GOOGLE_CREDENTIALS_PATH)%'
+      - '%google_credentials_path%'
 
   Gponty\EntityToGoogleSheetsBundle\Command\ExportEntitiesToSheetsCommand:
     arguments:
