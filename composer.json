@@ -1,6 +1,6 @@
 {
     "name": "gponty/entity-to-google-sheets-bundle",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Export Doctrine entities to Google Sheets",
     "type": "symfony-bundle",
     "license": "MIT",
