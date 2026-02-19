@@ -28,14 +28,17 @@ class GoogleSheetsExporter
         $existingSheets = $this->getExistingSheets();
 
         $this->ensureSheetsExist($entities, $existingSheets);
+        sleep(2);
 
         $existingSheets = $this->getExistingSheets();
 
         $this->fillIndexSheet($entities, $existingSheets);
+        sleep(1);
 
         foreach ($entities as $className => $data) {
             $sheetName = $this->sanitizeSheetName($data['tableName']);
             $this->fillEntitySheet($sheetName, $className, $data['fields']);
+            sleep(1);
         }
     }
 
@@ -67,28 +70,24 @@ class GoogleSheetsExporter
         array_shift($requests);
 
         if (!empty($requests)) {
-            $batchRequest = new BatchUpdateSpreadsheetRequest(['requests' => $requests]);
-            $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
+            $this->safeBatchUpdate($requests);
         }
 
         // Renommer le dernier onglet restant en "Index"
         $existingSheets = $this->getExistingSheets();
         $remainingSheetId = array_values($existingSheets)[0];
 
-        $batchRequest = new BatchUpdateSpreadsheetRequest([
-            'requests' => [
-                new Request([
-                    'updateSheetProperties' => [
-                        'properties' => [
-                            'sheetId' => $remainingSheetId,
-                            'title'   => 'Index'
-                        ],
-                        'fields' => 'title'
-                    ]
-                ])
-            ]
+        $this->safeBatchUpdate([
+            new Request([
+                'updateSheetProperties' => [
+                    'properties' => [
+                        'sheetId' => $remainingSheetId,
+                        'title'   => 'Index'
+                    ],
+                    'fields' => 'title'
+                ]
+            ])
         ]);
-        $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
     }
 
     private function ensureSheetsExist(array $entities, array $existing): void
@@ -107,8 +106,7 @@ class GoogleSheetsExporter
         }
 
         if (!empty($requests)) {
-            $batchRequest = new BatchUpdateSpreadsheetRequest(['requests' => $requests]);
-            $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
+            $this->safeBatchUpdate($requests);
         }
     }
 
@@ -158,7 +156,7 @@ class GoogleSheetsExporter
         // Liens cliquables vers chaque onglet
         $rowIndex = 1;
         foreach ($entities as $data) {
-            $sheetName    = $this->sanitizeSheetName($data['tableName']);
+            $sheetName     = $this->sanitizeSheetName($data['tableName']);
             $targetSheetId = $sheetIds[$sheetName] ?? null;
 
             if ($targetSheetId !== null) {
@@ -202,142 +200,153 @@ class GoogleSheetsExporter
             ]
         ]);
 
-        $batchRequest = new BatchUpdateSpreadsheetRequest(['requests' => $requests]);
-        $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
+        $this->safeBatchUpdate($requests);
     }
 
     private function fillEntitySheet(string $sheetName, string $className, array $fields): void
-{
-    $existingSheets = $this->getExistingSheets();
-    $sheetId = $existingSheets[$sheetName] ?? null;
-    $indexSheetId = $existingSheets['Index'] ?? 0;
+    {
+        $existingSheets = $this->getExistingSheets();
+        $sheetId        = $existingSheets[$sheetName] ?? null;
+        $indexSheetId   = $existingSheets['Index'] ?? 0;
 
-    // 1. Écrire le titre
-    $this->writeValues($sheetName, 'A1', [["Entité : {$className}"]]);
+        // 1. Écrire le titre
+        $this->writeValues($sheetName, 'A1', [["Entité : {$className}"]]);
 
-    // 2. Écrire le lien retour Index en ligne 2
-    $this->writeValues($sheetName, 'A2', [["⬅️ Retour à l'Index"]]);
+        // 2. Écrire le lien retour Index en ligne 2
+        $this->writeValues($sheetName, 'A2', [["⬅️ Retour à l'Index"]]);
 
-    // 3. Écrire les données à partir de la ligne 4
-    $values = [
-        ['🏷️ Propriété', '📋 Colonne SQL', '🔧 Type', '❓ Nullable', '📏 Longueur', '🔑 ID', '🔒 Unique', '📝 Description']
-    ];
-    foreach ($fields as $field) {
-        $values[] = [
-            $field['name'],
-            $field['column'],
-            $field['type'],
-            $field['nullable'],
-            (string)($field['length'] ?? ''),
-            $field['id'],
-            $field['unique'],
-            $field['description'] ?? '',
+        // 3. Écrire les données à partir de la ligne 4
+        $values = [
+            ['🏷️ Propriété', '📋 Colonne SQL', '🔧 Type', '❓ Nullable', '📏 Longueur', '🔑 ID', '🔒 Unique', '📝 Description']
         ];
-    }
-    $this->writeValues($sheetName, 'A4', $values);
+        foreach ($fields as $field) {
+            $values[] = [
+                $field['name'],
+                $field['column'],
+                $field['type'],
+                $field['nullable'],
+                (string)($field['length'] ?? ''),
+                $field['id'],
+                $field['unique'],
+                $field['description'] ?? '',
+            ];
+        }
+        $this->writeValues($sheetName, 'A4', $values);
 
-    if ($sheetId === null) return;
+        if ($sheetId === null) return;
 
-    $requests = [];
+        $requests = [];
 
-    // Merge titre ligne 1
-    $requests[] = new Request([
-        'mergeCells' => [
-            'range'     => ['sheetId' => $sheetId, 'startRowIndex' => 0, 'endRowIndex' => 1, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
-            'mergeType' => 'MERGE_ALL'
-        ]
-    ]);
+        // Merge titre ligne 1
+        $requests[] = new Request([
+            'mergeCells' => [
+                'range'     => ['sheetId' => $sheetId, 'startRowIndex' => 0, 'endRowIndex' => 1, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
+                'mergeType' => 'MERGE_ALL'
+            ]
+        ]);
 
-    // Style titre ligne 1
-    $requests[] = new Request([
-        'repeatCell' => [
-            'range' => ['sheetId' => $sheetId, 'startRowIndex' => 0, 'endRowIndex' => 1, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
-            'cell'  => [
-                'userEnteredFormat' => [
-                    'backgroundColor'     => ['red' => 0.15, 'green' => 0.15, 'blue' => 0.15],
-                    'textFormat'          => ['bold' => true, 'fontSize' => 14, 'foregroundColor' => ['red' => 1, 'green' => 1, 'blue' => 1]],
-                    'horizontalAlignment' => 'CENTER'
-                ]
-            ],
-            'fields' => 'userEnteredFormat'
-        ]
-    ]);
-
-    // Merge lien retour ligne 2
-    $requests[] = new Request([
-        'mergeCells' => [
-            'range'     => ['sheetId' => $sheetId, 'startRowIndex' => 1, 'endRowIndex' => 2, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
-            'mergeType' => 'MERGE_ALL'
-        ]
-    ]);
-
-    // Lien retour Index avec style
-    $requests[] = new Request([
-        'updateCells' => [
-            'rows'   => [[
-                'values' => [[
-                    'userEnteredValue'  => ['stringValue' => "⬅️ Retour à l'Index"],
+        // Style titre ligne 1
+        $requests[] = new Request([
+            'repeatCell' => [
+                'range' => ['sheetId' => $sheetId, 'startRowIndex' => 0, 'endRowIndex' => 1, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
+                'cell'  => [
                     'userEnteredFormat' => [
-                        'backgroundColor'     => ['red' => 0.95, 'green' => 0.95, 'blue' => 0.95],
-                        'horizontalAlignment' => 'CENTER',
-                        'textFormat'          => [
-                            'link'            => ['uri' => "#gid={$indexSheetId}"],
-                            'foregroundColor' => ['red' => 0.1, 'green' => 0.3, 'blue' => 0.9],
-                            'underline'       => true,
-                            'bold'            => true,
-                            'fontSize'        => 11,
-                        ]
+                        'backgroundColor'     => ['red' => 0.15, 'green' => 0.15, 'blue' => 0.15],
+                        'textFormat'          => ['bold' => true, 'fontSize' => 14, 'foregroundColor' => ['red' => 1, 'green' => 1, 'blue' => 1]],
+                        'horizontalAlignment' => 'CENTER'
                     ]
-                ]]
-            ]],
-            'fields' => 'userEnteredValue,userEnteredFormat',
-            'range'  => [
-                'sheetId'          => $sheetId,
-                'startRowIndex'    => 1,
-                'endRowIndex'      => 2,
-                'startColumnIndex' => 0,
-                'endColumnIndex'   => 1,
+                ],
+                'fields' => 'userEnteredFormat'
             ]
-        ]
-    ]);
+        ]);
 
-    // Style header champs ligne 4
-    $requests[] = new Request([
-        'repeatCell' => [
-            'range' => ['sheetId' => $sheetId, 'startRowIndex' => 3, 'endRowIndex' => 4, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
-            'cell'  => [
-                'userEnteredFormat' => [
-                    'backgroundColor' => ['red' => 0.2, 'green' => 0.5, 'blue' => 0.8],
-                    'textFormat'      => ['bold' => true, 'foregroundColor' => ['red' => 1, 'green' => 1, 'blue' => 1]],
+        // Merge lien retour ligne 2
+        $requests[] = new Request([
+            'mergeCells' => [
+                'range'     => ['sheetId' => $sheetId, 'startRowIndex' => 1, 'endRowIndex' => 2, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
+                'mergeType' => 'MERGE_ALL'
+            ]
+        ]);
+
+        // Lien retour Index avec style
+        $requests[] = new Request([
+            'updateCells' => [
+                'rows'   => [[
+                    'values' => [[
+                        'userEnteredValue'  => ['stringValue' => "⬅️ Retour à l'Index"],
+                        'userEnteredFormat' => [
+                            'backgroundColor'     => ['red' => 0.95, 'green' => 0.95, 'blue' => 0.95],
+                            'horizontalAlignment' => 'CENTER',
+                            'textFormat'          => [
+                                'link'            => ['uri' => "#gid={$indexSheetId}"],
+                                'foregroundColor' => ['red' => 0.1, 'green' => 0.3, 'blue' => 0.9],
+                                'underline'       => true,
+                                'bold'            => true,
+                                'fontSize'        => 11,
+                            ]
+                        ]
+                    ]]
+                ]],
+                'fields' => 'userEnteredValue,userEnteredFormat',
+                'range'  => [
+                    'sheetId'          => $sheetId,
+                    'startRowIndex'    => 1,
+                    'endRowIndex'      => 2,
+                    'startColumnIndex' => 0,
+                    'endColumnIndex'   => 1,
                 ]
-            ],
-            'fields' => 'userEnteredFormat(backgroundColor,textFormat)'
-        ]
-    ]);
-
-    // Freeze 4 premières lignes
-    $requests[] = new Request([
-        'updateSheetProperties' => [
-            'properties' => ['sheetId' => $sheetId, 'gridProperties' => ['frozenRowCount' => 4]],
-            'fields'     => 'gridProperties.frozenRowCount'
-        ]
-    ]);
-
-    // Autosize en dernier
-    $requests[] = new Request([
-        'autoResizeDimensions' => [
-            'dimensions' => [
-                'sheetId'    => $sheetId,
-                'dimension'  => 'COLUMNS',
-                'startIndex' => 0,
-                'endIndex'   => 8,
             ]
-        ]
-    ]);
+        ]);
 
-    $batchRequest = new BatchUpdateSpreadsheetRequest(['requests' => $requests]);
-    $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
-}
+        // Style header champs ligne 4
+        $requests[] = new Request([
+            'repeatCell' => [
+                'range' => ['sheetId' => $sheetId, 'startRowIndex' => 3, 'endRowIndex' => 4, 'startColumnIndex' => 0, 'endColumnIndex' => 8],
+                'cell'  => [
+                    'userEnteredFormat' => [
+                        'backgroundColor' => ['red' => 0.2, 'green' => 0.5, 'blue' => 0.8],
+                        'textFormat'      => ['bold' => true, 'foregroundColor' => ['red' => 1, 'green' => 1, 'blue' => 1]],
+                    ]
+                ],
+                'fields' => 'userEnteredFormat(backgroundColor,textFormat)'
+            ]
+        ]);
+
+        // Freeze 4 premières lignes
+        $requests[] = new Request([
+            'updateSheetProperties' => [
+                'properties' => ['sheetId' => $sheetId, 'gridProperties' => ['frozenRowCount' => 4]],
+                'fields'     => 'gridProperties.frozenRowCount'
+            ]
+        ]);
+
+        // Autosize en dernier
+        $requests[] = new Request([
+            'autoResizeDimensions' => [
+                'dimensions' => [
+                    'sheetId'    => $sheetId,
+                    'dimension'  => 'COLUMNS',
+                    'startIndex' => 0,
+                    'endIndex'   => 8,
+                ]
+            ]
+        ]);
+
+        $this->safeBatchUpdate($requests);
+    }
+
+    private function safeBatchUpdate(array $requests): void
+    {
+        if (empty($requests)) return;
+
+        $chunks = array_chunk($requests, 10);
+
+        foreach ($chunks as $chunk) {
+            $batchRequest = new BatchUpdateSpreadsheetRequest(['requests' => $chunk]);
+            $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchRequest);
+            sleep(1);
+        }
+    }
 
     private function writeValues(string $sheet, string $range, array $values): void
     {
@@ -348,6 +357,7 @@ class GoogleSheetsExporter
             $body,
             ['valueInputOption' => 'USER_ENTERED']
         );
+        usleep(500000);
     }
 
     private function sanitizeSheetName(string $name): string
