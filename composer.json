@@ -1,0 +1,26 @@
+{
+    "name": "gponty/entity-to-google-sheets-bundle",
+    "version": "1.0.0",
+    "description": "Export Doctrine entities to Google Sheets",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Gponty\\EntityToGoogleSheetsBundle\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.2",
+        "symfony/framework-bundle": "^7.0|^8.0",
+        "doctrine/orm": "^3.0",
+        "google/apiclient": "^2.15"
+    },
+    "require-dev": {
+        "symfony/console": "^7.0|^8.0"
+    },
+    "extra": {
+        "symfony": {
+            "require": "^7.0|^8.0"
+        }
+    }
+}

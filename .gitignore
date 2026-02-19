@@ -1,0 +1,68 @@
+# Composer
+/vendor/
+composer.lock
+.php-version
+
+# Symfony
+/.env
+/.env.local
+/.env.*.local
+/var/
+/public/uploads/
+/public/bundles/
+
+# Credentials and sensitive data
+/credentials/
+google-credentials.json
+*.pem
+*.key
+*.crt
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+.DS_Store
+.history/
+.vscode-settings.json
+
+# Testing
+/.phpunit.result.cache
+/coverage/
+*.log
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node (if using frontend build)
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Cache
+.cache/
+*.cache
+
+# Local development files
+.env.test.local
+.env.dev.local
+
+# Build artifacts
+/dist/
+/build/

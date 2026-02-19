@@ -1,0 +1,16 @@
+services:
+  Gponty\EntityToGoogleSheetsBundle\Service\EntityReader:
+    arguments:
+      - '@doctrine'
+
+  Gponty\EntityToGoogleSheetsBundle\Service\GoogleSheetsExporter:
+    arguments:
+      - '%env(GOOGLE_SHEET_ID)%'
+      - '%env(GOOGLE_CREDENTIALS_PATH)%'
+
+  Gponty\EntityToGoogleSheetsBundle\Command\ExportEntitiesToSheetsCommand:
+    arguments:
+      - '@Gponty\EntityToGoogleSheetsBundle\Service\EntityReader'
+      - '@Gponty\EntityToGoogleSheetsBundle\Service\GoogleSheetsExporter'
+    tags:
+      - { name: console.command }
