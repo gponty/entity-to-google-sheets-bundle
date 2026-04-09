@@ -149,6 +149,54 @@ Pour une mise à jour automatique périodique :
 
 Cela va exécuter l'export chaque nuit à 2h du matin.
 
+## Attribut `SheetDescription`
+
+Le bundle fournit un attribut PHP `SheetDescription` qui permet d'ajouter des descriptions personnalisées sur vos entités et leurs propriétés. Ces descriptions seront exportées dans Google Sheets aux côtés des métadonnées techniques.
+
+### Sur une classe d'entité
+
+```php
+use Gponty\EntityToGoogleSheetsBundle\Attribute\SheetDescription;
+
+#[SheetDescription('Représente un utilisateur de la plateforme')]
+class User
+{
+    // ...
+}
+```
+
+### Sur les propriétés
+
+```php
+use Doctrine\ORM\Mapping as ORM;
+use Gponty\EntityToGoogleSheetsBundle\Attribute\SheetDescription;
+
+#[ORM\Entity]
+#[SheetDescription('Représente un utilisateur de la plateforme')]
+class User
+{
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column]
+    #[SheetDescription('Identifiant unique de l\'utilisateur')]
+    private ?int $id = null;
+
+    #[ORM\Column(length: 180, unique: true)]
+    #[SheetDescription('Adresse email utilisée pour la connexion')]
+    private string $email;
+
+    #[ORM\Column]
+    #[SheetDescription('Date de création du compte')]
+    private \DateTimeImmutable $createdAt;
+
+    #[ORM\ManyToOne(targetEntity: Company::class)]
+    #[SheetDescription('Entreprise à laquelle l\'utilisateur est rattaché')]
+    private ?Company $company = null;
+}
+```
+
+L'attribut est optionnel : si aucune description n'est définie, la colonne description sera simplement vide dans le Google Sheet.
+
 ## Structure des données exportées
 
 ### Chaque onglet d'entité contient :
